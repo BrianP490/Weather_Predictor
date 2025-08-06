@@ -1,0 +1,9 @@
+Download the dataset from hugging face datasets
+
+Save the csv file
+
+Create 
+
+
+# Optimization Problem
+    Minimize the Mean Squared Error of "MAX_TEMP" Prediction
