@@ -1,7 +1,11 @@
+/__pycache__
 /Data
 CA_Weather_Fire_Dataset_1984-2025.csv
+/HuggingFace
 
 .vscode
-
+# Folder Files
 /RAW
 /Data_Old
+/models
+/notebooks/models
