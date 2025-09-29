@@ -9,3 +9,6 @@ CA_Weather_Fire_Dataset_1984-2025.csv
 /Data_Old
 /models
 /notebooks/models
+
+# Folders
+logs/
