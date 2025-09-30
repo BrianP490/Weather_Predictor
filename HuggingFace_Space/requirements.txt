@@ -1,0 +1,9 @@
+# For streamlit using python 3.10
+torch==2.7.1+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+tqdm==4.67.1
+numpy==2.2.6
+streamlit==1.45.1
+joblib==1.5.1
+pandas==2.3.1
+scikit-learn==1.7.1
