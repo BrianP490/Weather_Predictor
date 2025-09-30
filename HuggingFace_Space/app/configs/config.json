@@ -1,0 +1,19 @@
+{
+  "model": {
+    "in_dim": 5,
+    "intermediate_dim": 128,
+    "out_dim": 1,
+    "num_blocks": 12,
+    "dropout_rate": 0.1
+  },
+  "logging": {
+    "log_to_file": true,
+    "log_file": "logs/app.log",
+    "logger_name": "main",
+    "log_level": "INFO",
+    "log_mode": "w",
+    "log_format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "date_format": "%Y-%m-%d %H:%M:%S",
+    "log_to_console": true
+  }
+}
