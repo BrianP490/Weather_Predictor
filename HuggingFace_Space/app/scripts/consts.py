@@ -1,5 +1,6 @@
 """
-This module defines constants for file paths and feature names used in the application."""
+This module defines constants for file paths and feature names used in the application.
+"""
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -18,4 +19,10 @@ FEATURE_SCALER_PATH = BASE_DIR / SCALER_DIRECTORY / FEATURE_SCALER_FILE_NAME
 
 
 # Same feature order names and order as during the model training data set
-FEATURE_NAMES = ['DAY_OF_YEAR', 'PRECIPITATION', 'LAGGED_PRECIPITATION', 'AVG_WIND_SPEED', 'MIN_TEMP']
+FEATURE_NAMES = [
+    'DAY_OF_YEAR',
+    'PRECIPITATION',
+    'LAGGED_PRECIPITATION',
+    'AVG_WIND_SPEED',
+    'MIN_TEMP'
+]

@@ -1,16 +1,26 @@
+"""This module contains the training loop for an Agent model."""
+
 # # Creating Training Loop
 
 # ## VERSIONS
-# - 00_02: 
+# - 00_02:
 #     - Created to try new Model architecture and align with project template
-# - 00_01: 
+# - 00_01:
 #     - Diagnosing Exploding Gradients
-# - 00_00: 
+# - 00_00:
 #     - Initial Version
 
 # ## Imports
 
-# from importlib.metadata import version
+import json
+import logging
+import argparse
+import time
+import torch
+import joblib
+import os
+import io
+import sys
 from importlib.metadata import version
 import pandas as pd
 from pathlib import Path
@@ -18,7 +28,6 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from tqdm import tqdm
-import json, logging, argparse, time, torch, joblib, os, io, sys
 from argparse import Namespace
 from logging import Logger # For type hinting
 from torch.nn import Module # For type hinting
@@ -28,8 +37,8 @@ from sklearn.preprocessing import StandardScaler
 
 from importlib.metadata import version
 
-list = ['pandas', 'seaborn', 'matplotlib', 'torch', 'joblib', 'tqdm']
-for package in list:
+package_list = ['pandas', 'seaborn', 'matplotlib', 'torch', 'joblib', 'tqdm']
+for package in package_list:
     try:
         print(f"{package} version: {version(package)}") # Raises PackageNotFoundError if not found
     except:
@@ -58,14 +67,14 @@ class CustomDataset(Dataset):
         # Define feature and label columns
         self.feature_columns = self.data.columns.drop("MAX_TEMP")
         self.label_column = "MAX_TEMP"
-        
 
     def __getitem__(self, index):
         """Returns a tuple (features, label) for the given index.
         Args:
             index (int): Index of the data sample to retrieve.
         Returns:
-            tuple: (features, label) where features is a tensor of input features and label is the corresponding label.
+            tuple: (features, label) where features is a tensor of input features and
+            label is the corresponding label.
         """
         features = self.data.loc[index, self.feature_columns].values
         
@@ -97,7 +106,7 @@ def clean_data(df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         buffer = io.StringIO()  # Create a buffer to capture the info output
         df.info(buf=buffer) # Store the output into the buffer
         logger.info(f"Initial DataFrame info:\n " + buffer.getvalue())
-    
+
     # Example cleaning steps (customize as needed)
     df = df.drop_duplicates() # Remove duplicates
 
@@ -106,9 +115,10 @@ def clean_data(df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         logger.info("Handling missing values...")
         df = df.dropna()  # Example: Drop rows with missing values
         logger.info(f"DataFrame shape after dropping missing values: {df.shape}")
-    
+
     if show_dataframe_info:
-        # Reinitialize the buffer to clear any previous content in order to log the final dataframe info
+        # Reinitialize the buffer to clear any previous content in order to log the 
+        # final dataframe info
         buffer = io.StringIO()
         df.info(buf=buffer)
         logger.info(f"Final DataFrame info:\n " + buffer.getvalue())
@@ -117,7 +127,18 @@ def clean_data(df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
 
 # ### Data Pipeline Function
 
-def data_pipeline(logger: Logger, dataset_url: str, root_data_dir: str= "../Data", data_file_path: str="Dataset.csv", data_splits_dir: str="DataSplits", scaler_dir = "Scalers", target_column: str="Target", extra_dropped_columns: Optional[List[str]]=None, batch_size: int=64, num_workers: int=0, pin_memory: bool=False, drop_last: bool=True) -> tuple[Dataset, Dataset, Dataset, DataLoader, DataLoader, DataLoader, StandardScaler]:
+def data_pipeline(
+        logger: Logger, dataset_url: str, root_data_dir: str= "../Data",
+        data_file_path: str="Dataset.csv", data_splits_dir: str="DataSplits",
+        scaler_dir = "Scalers", target_column: str="Target",
+        extra_dropped_columns: Optional[List[str]]=None, batch_size: int=64,
+        num_workers: int=0, pin_memory: bool=False, drop_last: bool=True) -> tuple[Dataset,
+                                                                                   Dataset,
+                                                                                   Dataset,
+                                                                                   DataLoader,
+                                                                                   DataLoader,
+                                                                                   DataLoader,
+                                                                                   StandardScaler]:
     """This function prepares the train, test, and validation datasets.
     Args:
         logger (Logger): The logger instance to log messages.
@@ -142,8 +163,8 @@ def data_pipeline(logger: Logger, dataset_url: str, root_data_dir: str= "../Data
         validation_dataloader (DataLoader): The validation dataloader.
         feature_scaler (MinMaxScaler): The scaler used to scale the features of the model input.
         """
-    
-    if not root_data_dir or not data_file_path or not data_splits_dir:  # Check for empty strings at the beginning
+    # Check for empty strings at the beginning
+    if not root_data_dir or not data_file_path or not data_splits_dir:
         raise ValueError("File and directory paths cannot be empty strings.")
     logger.info(f"root_data_dir: {root_data_dir}")
     DATA_ROOT = Path(root_data_dir)
@@ -164,7 +185,8 @@ def data_pipeline(logger: Logger, dataset_url: str, root_data_dir: str= "../Data
 
             df.to_csv(DATA_CLEAN_PATH, index=False)     # Save the file, omitting saving the row index
         except Exception as e:
-            raise RuntimeError(f"An unexpected error occurred when downloading or saving the dataset from '{dataset_url}' to '{DATA_CLEAN_PATH}'")
+            raise RuntimeError(f"An unexpected error occurred when downloading or saving the "
+                               "dataset from '{dataset_url}' to '{DATA_CLEAN_PATH}'")
     
      # Define the paths for the data splits and scalers
     DATA_SPLITS_DIR = DATA_ROOT / data_splits_dir
@@ -179,7 +201,9 @@ def data_pipeline(logger: Logger, dataset_url: str, root_data_dir: str= "../Data
     # Define the columns to drop from the features
     columns_to_drop = [target_column] + extra_dropped_columns
 
-    if os.path.exists(TRAIN_DATA_PATH) and os.path.exists(TEST_DATA_PATH) and os.path.exists(VALIDATION_DATA_PATH) :
+    if (os.path.exists(TRAIN_DATA_PATH) and 
+        os.path.exists(TEST_DATA_PATH) and
+        os.path.exists(VALIDATION_DATA_PATH)):
         print(f"Train, Test, and Validation csv datasets detected in '{DATA_SPLITS_DIR}', skipping generation and loading scaler(s)")
         try:
             feature_scaler = joblib.load(FEATURE_SCALER_PATH)
@@ -869,11 +893,11 @@ if __name__ == '__main__':
 
     elapsed_time= main_end_time - main_start_time
     hrs = int(elapsed_time / 3600)
-    min = int((elapsed_time % 3600) / 60)
-    seconds_remaining = elapsed_time - (hrs * 3600) - (min * 60)
+    mins = int((elapsed_time % 3600) / 60)
+    seconds_remaining = elapsed_time - (hrs * 3600) - (mins * 60)
 
     logger.info(f"FINISHED MAIN SCRIPT")
-    logger.info(f"OVERALL DURATION: {hrs} Hours, {min} Minutes, and {seconds_remaining:.3f} Seconds")
+    logger.info(f"OVERALL DURATION: {hrs} Hours, {mins} Minutes, and {seconds_remaining:.3f} Seconds")
 
     # --- Determine final message based on return code ---
     if ret == 0:

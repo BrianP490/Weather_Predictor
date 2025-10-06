@@ -1,3 +1,4 @@
+"""Initialization script for the scripts package."""
 from .model import Agent, ModuleLayer
 from .utils import convert_inputs
 from .consts import (
