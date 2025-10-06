@@ -1,73 +1,100 @@
 # main.py
+import json 
 import torch
-import streamlit as st
-from scripts import Agent, ModuleLayer
-import os
 import joblib
-st.title("Oil Predictor")
+import sys
+import streamlit as st
+from scripts import ModuleLayer, Agent, convert_inputs
+from scripts import (
+    MODEL_WEIGHTS_FULL_PATH,
+    CONFIG_PATH,
+    FEATURE_SCALER_PATH,
+    FEATURE_NAMES as feature_names
+)
+import pandas as pd
 
-cfg = {
-    "in_dim": 22,    # Number of Features as input
-    "intermediate_dim": 128,    
-    "out_dim": 1,   
-    "num_blocks": 12,   # Number of reapeating Layer Blocks
-    "dropout_rate": 0.1     # Rate for dropout layer
-}
+# Main Loop
+# Call this function, during script execution; Main script entry point
+if __name__ == '__main__':
+    st.title("Agent")
+    st.subheader("Predicts the MAX Temperature (F) of a given day", divider=True)
 
-agent = Agent(cfg)    # Create agent instance
+    # Load model weights
+    try:
+        model_weights = torch.load(MODEL_WEIGHTS_FULL_PATH, weights_only=True)
+        print(f"✅ Model weights loaded successfully from {MODEL_WEIGHTS_FULL_PATH}")
+    except FileNotFoundError:
+        print(f"❌ Model Weights file not found at '{MODEL_WEIGHTS_FULL_PATH}'. Please ensure the file exists or fix path to file.")
+        sys.exit(1)
 
-# Dynamically create the path to the model's weights 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # Get directory of current running file
+    # Load configuration file
+    try:
+        with open(CONFIG_PATH, 'r') as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        print(f"❌ Configuration file not found at '{CONFIG_PATH}'. Please ensure the file exists or fix path to file.")
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"❌ Failed to parse JSON: {e}")
+        sys.exit(1)
 
-weights_file = os.path.join(BASE_DIR, "model_weights", "Agent_02.pt") # create the full path to the model weights
-# Create the full path to the scalers
-features_scaler_file = os.path.join(BASE_DIR, "scalers", "feature-scaler.joblib") 
-label_scaler_file = os.path.join(BASE_DIR, "scalers", "label-scaler.joblib") 
+    # Load feature scaler
+    try:
+        feature_scaler = joblib.load(FEATURE_SCALER_PATH)
+        print(f"✅ Feature Scaler loaded successfully from {FEATURE_SCALER_PATH}")
 
-features_scaler = joblib.load(features_scaler_file) # Load feature scaler
-label_scaler = joblib.load(label_scaler_file)     # Load label scaler
-
-agent.load_state_dict(torch.load(weights_file, weights_only=True)) # Load the agent's model weights
-
-
-# User inputs
-open = st.number_input("What is the opening price of oil?", min_value=0.0, value=200.0, key="open")
-high = st.number_input("What was the previous Highest price of oil?", min_value=0.0, value=200.0, key="high")
-low = st.number_input("What was the previous Lowest price of oil?", min_value=0.0, value=200.0, key="low")
-cali = st.number_input("What was the 'First purchase' price for crude oil in California of the previous month? ($/bbl)", min_value=0.0, value=200.0, key="cali")
-texas = st.number_input("What was the 'First purchase' price for crude oil in Texas of the previous month? ($/bbl)", min_value=0.0, value=200.0, key="texas")
-us_crude_first = st.number_input("What was the 'First purchase' average price in the U.S. of the previous month? ($/bbl)", min_value=0.0, value=200.0, key="us_crude_first")
-
-US_Imports_from_Canada = st.number_input("What was the U.S. crude oil imports from Canada of the previous month? (thousand bbl/day)", min_value=0.0, value=200.0, key="US_Imports_from_Canada")
-US_Imports_from_Colombia = st.number_input("What was the U.S. crude oil imports from Colombia of the previous month? (thousand bbl/day)", min_value=0.0, value=200.0, key="US_Imports_from_Colombia")
-US_Imports_from_United_Kingdom = st.number_input("What was the U.S. crude oil imports from the United Kingdom of the previous month? (thousand bbl/day)", min_value=0.0, value=200.0, key="US_Imports_from_United_Kingdom")
-US_Imports_from_Mexico = st.number_input("What was the U.S. crude oil imports from Mexico of the previous month? (thousand bbl/day)", min_value=0.0, value=200.0, key="US_Imports_from_Mexico")
-US_Imports_from_OPEC_Countries = st.number_input("What was the U.S. crude oil imports from OPEC Countries of the previous month? (thousand bbl/day)", min_value=0.0, value=200.0, key="US_Imports_from_OPEC_Countries")
-US_Imports_from_Non_OPEC_Countries = st.number_input("What was the U.S. crude oil imports from Non-OPEC Countries of the previous month? (thousand bbl/day)", min_value=0.0, value=200.0, key="US_Imports_from_Non_OPEC_Countries")
-US_Imports = st.number_input("What was the U.S. crude oil imports? (thousand bbl/day)", min_value=0.0, value=200.0, key="US_Imports")
-
-US_Exports_to_Canada = st.number_input("How much oil did the U.S. export to Canada last month? (thousand bbl/day)", min_value=0.0, value=200.0, key="US_Exports_to_Canada")
-US_Exports = st.number_input("What was the U.S. crude oil exports last month? (thousand bbl/day)", min_value=0.0, value=200.0, key="US_Exports")
-
-US_Net_Imports_from_Canada = st.number_input("What was the U.S. crude oil NET imports from Canada of the previous month? (thousand bbl/day)", value=200.0, key="US_Net_Imports_from_Canada")
-US_Net_Imports_from_Colombia = st.number_input("What was the U.S. crude oil NET imports from Colombia of the previous month? (thousand bbl/day)", value=200.0, key="US_Net_Imports_from_Colombia")
-US_Net_Imports_from_Mexico = st.number_input("What was the U.S. crude oil NET imports from Mexico of the previous month? (thousand bbl/day)", value=200.0, key="US_Net_Imports_from_Mexico")
-US_Net_Imports_from_United_Kingdom = st.number_input("What was the U.S. crude oil NET imports from the United Kingdom of the previous month? (thousand bbl/day)", value=200.0, key="US_Net_Imports_from_United_Kingdom")
-US_Net_Imports_from_OPEC_Countries = st.number_input("What was the U.S. crude oil NET imports from OPEC Countries of the previous month? (thousand bbl/day)", value=200.0, key="US_Net_Imports_from_OPEC_Countries")
-US_Net_Imports_from_Non_OPEC_Countries = st.number_input("What was the U.S. crude oil NET imports from OPEC Countries of the previous month? (thousand bbl/day)", value=200.0, key="US_Net_Imports_from_Non_OPEC_Countries")
-US_Net_Imports = st.number_input("What was the U.S. crude oil NET imports of the previous month? (thousand bbl/day)", value=200.0, key="US_Net_Imports")
+    except FileNotFoundError:
+        print(f"❌ Configuration file not found at '{FEATURE_SCALER_PATH}'. Please ensure the file exists or fix path to file.")
+    except Exception as e:
+        print(f"❌ An unexpected error occurred when loading scalers: {e}")
+        sys.exit(1)
 
 
+    MODEL_CONFIG = config.get("model", {})
+    
+    try:
+        agent = Agent(cfg=MODEL_CONFIG)    # Create agent instance
+        agent.load_state_dict(state_dict=model_weights)
+    except Exception as e:
+        print(f"❌ An error occurred while creating model or loading model weights: {e}")
+        sys.exit(1)
 
-# Prepare input tensor
-raw_inputs = (open, high, low, cali, texas, us_crude_first, US_Imports_from_Canada, US_Imports_from_Colombia, US_Imports_from_United_Kingdom, US_Imports_from_Mexico, US_Imports_from_OPEC_Countries, US_Imports_from_Non_OPEC_Countries, US_Imports, US_Exports_to_Canada, US_Exports, US_Net_Imports_from_Canada, US_Net_Imports_from_Colombia, US_Net_Imports_from_Mexico, US_Net_Imports_from_United_Kingdom, US_Net_Imports_from_OPEC_Countries, US_Net_Imports_from_Non_OPEC_Countries, US_Net_Imports)
+    agent.eval().to('cpu')
 
-inputs = features_scaler.transform([raw_inputs])  # Scale the inputs using the pre-fitted scaler
+    with st.form("my_form"):
+        st.write("Please provide the following information:")
 
-inputs = torch.tensor(inputs, dtype=torch.float32) # Convert to tensor
+        # User inputs
+        d_o_y = st.number_input("What day of the year is it (1-355)?", min_value=1, max_value=365, value=220, step=1, key="d_o_y")
 
-# Predict Price
-if st.button("Get Agent's Prediction"):
-    unnormalized_pred = agent.get_prediction(inputs)
-    pred = label_scaler.inverse_transform([[unnormalized_pred]])[0,0]  # Un-normalize the prediction
-    st.success(f"Agent Predicts The Closing Price is: **{pred:.7f}**")
+        precip = st.slider("What are today's expected precipitation levels (in inches)?", min_value=0.0, max_value=10.0, value=.1, key="precip")
+
+        l_precip = st.slider("What are yesterday's precipitation levels (in inches)?", min_value=0.0, max_value=20.0, value=.1, key="l_precip")
+
+        wind = st.number_input("What is the average wind speed for today?", min_value=0, max_value=75, value=2, step=1, key="wind")
+
+        min_temp = st.number_input("What is the minimum temperature for today?", min_value=0, max_value=75, value=2, step=1, key="min_temp")
+
+
+        # Process the inputs and sample from the model
+        submitted = st.form_submit_button("Get Prediction")
+        if submitted:
+            # Create a list of features from the user's inputs
+            INPUTS=[d_o_y, precip, l_precip, wind, min_temp]
+
+            # Convert inputs to the correct format using the expansion operator
+            converted_inputs = convert_inputs(*INPUTS)
+
+            # Create a DataFrame for the scaler using the feature names to prevent warnings
+            input_df = pd.DataFrame([converted_inputs], columns=feature_names)
+
+            # Transform input tensor
+            inputs = feature_scaler.transform(input_df)  # Scale the inputs using the pre-fitted scaler
+
+            inputs = torch.tensor(inputs, dtype=torch.float32) # Convert to tensor
+
+            # Get the agent's prediction
+            pred = agent.get_prediction(inputs)
+            
+            # Display the agent's prediction
+            st.success(f"Agent Predicts: **{pred:.2f}** (°F)")
