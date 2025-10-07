@@ -4,6 +4,8 @@
 
 # ## VERSIONS
 # - 00_02:
+    # - Refactor DataPipeline functions
+    # - Updated to align more with PEP8
 #     - Created to try new Model architecture and align with project template
 # - 00_01:
 #     - Diagnosing Exploding Gradients
@@ -12,36 +14,33 @@
 
 # ## Imports
 
+import os
+import io
+import sys
+from pathlib import Path
+from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError # For handling package version errors
+from logging import Logger # For type hinting
+from typing import List, Optional # For type hinting
 import json
 import logging
 import argparse
 import time
-import torch
 import joblib
-import os
-import io
-import sys
-from importlib.metadata import version
 import pandas as pd
-from pathlib import Path
+from pandas.errors import ParserError
+import torch
+from torch.nn import Module # For type hinting
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
-from tqdm import tqdm
-from argparse import Namespace
-from logging import Logger # For type hinting
-from torch.nn import Module # For type hinting
-from typing import Dict, Any, List, Optional # For type hinting
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-
-from importlib.metadata import version
+from tqdm import tqdm
 
 package_list = ['pandas', 'seaborn', 'matplotlib', 'torch', 'joblib', 'tqdm']
 for package in package_list:
     try:
         print(f"{package} version: {version(package)}") # Raises PackageNotFoundError if not found
-    except:
+    except PackageNotFoundError:
         print(f"❌ Package '{package}' not found. Please install it.")
 
 # ## Global Variables
@@ -58,7 +57,8 @@ class CustomDataset(Dataset):
         """Initializer for the Dataset class.
         Args:
             csv_file (str): Path to the CSV file containing the dataset.
-            label_column (str): The name of the column indicating the label."""
+            label_column (str): The name of the column indicating the label.
+        """
         try:
             self.data = pd.read_csv(csv_file)   # Assign a pandas data frame
         except FileNotFoundError:
@@ -77,7 +77,7 @@ class CustomDataset(Dataset):
             label is the corresponding label.
         """
         features = self.data.loc[index, self.feature_columns].values
-        
+
         label = self.data.loc[index, self.label_column] # Extract the label for the given index
         return (
             torch.tensor(features, dtype=torch.float),
@@ -105,7 +105,7 @@ def clean_data(df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         logger.info(f"Initial DataFrame shape: {df.shape}")
         buffer = io.StringIO()  # Create a buffer to capture the info output
         df.info(buf=buffer) # Store the output into the buffer
-        logger.info(f"Initial DataFrame info:\n " + buffer.getvalue())
+        logger.info("Initial DataFrame info:\n " + buffer.getvalue())
 
     # Example cleaning steps (customize as needed)
     df = df.drop_duplicates() # Remove duplicates
@@ -117,11 +117,11 @@ def clean_data(df: pd.DataFrame, logger: Logger) -> pd.DataFrame:
         logger.info(f"DataFrame shape after dropping missing values: {df.shape}")
 
     if show_dataframe_info:
-        # Reinitialize the buffer to clear any previous content in order to log the 
+        # Reinitialize the buffer to clear any previous content in order to log the
         # final dataframe info
         buffer = io.StringIO()
         df.info(buf=buffer)
-        logger.info(f"Final DataFrame info:\n " + buffer.getvalue())
+        logger.info("Final DataFrame info:\n " + buffer.getvalue())
 
     return df
 
@@ -162,7 +162,7 @@ def data_pipeline(
         test_dataloader (DataLoader): The test dataloader.
         validation_dataloader (DataLoader): The validation dataloader.
         feature_scaler (MinMaxScaler): The scaler used to scale the features of the model input.
-        """
+    """
     # Check for empty strings at the beginning
     if not root_data_dir or not data_file_path or not data_splits_dir:
         raise ValueError("File and directory paths cannot be empty strings.")
@@ -184,10 +184,18 @@ def data_pipeline(
             df = clean_data(df, logger)
 
             df.to_csv(DATA_CLEAN_PATH, index=False)     # Save the file, omitting saving the row index
-        except Exception as e:
+        
+        except OSError as e:
+            raise RuntimeError(f"OS error occurred: {e}")
+        except ParserError:
+            raise RuntimeError(f"Failed to parse CSV from '{dataset_url}'")
+        except ValueError as e:
+            raise RuntimeError(f"Data cleaning error: {e}")
+        except Exception:
             raise RuntimeError(f"An unexpected error occurred when downloading or saving the "
-                               "dataset from '{dataset_url}' to '{DATA_CLEAN_PATH}'")
-    
+                               f"dataset from '{dataset_url}' to '{DATA_CLEAN_PATH}'")
+
+
      # Define the paths for the data splits and scalers
     DATA_SPLITS_DIR = DATA_ROOT / data_splits_dir
     SCALER_DIR = DATA_ROOT / scaler_dir
@@ -201,14 +209,18 @@ def data_pipeline(
     # Define the columns to drop from the features
     columns_to_drop = [target_column] + extra_dropped_columns
 
-    if (os.path.exists(TRAIN_DATA_PATH) and 
+    if (os.path.exists(TRAIN_DATA_PATH) and
         os.path.exists(TEST_DATA_PATH) and
         os.path.exists(VALIDATION_DATA_PATH)):
         print(f"Train, Test, and Validation csv datasets detected in '{DATA_SPLITS_DIR}', skipping generation and loading scaler(s)")
         try:
             feature_scaler = joblib.load(FEATURE_SCALER_PATH)
+        except FileNotFoundError as e:
+            raise RuntimeError(f"Scaler file not found: {e}")
+        except EOFError as e:
+            raise RuntimeError(f"Scaler file appears to be empty or corrupted: {e}")
         except Exception as e:
-            raise RuntimeError(f"An unexpected error occurred when loading scalers: {e}")    
+            raise RuntimeError(f"An unexpected error occurred when loading scalers: {e}")
     else:
         logger.info(f"Datasets not found in '{DATA_SPLITS_DIR}' or incomplete. Generating datasets...")
         # os.makedirs(MODEL_ROOT, exist_ok=True)
@@ -296,7 +308,7 @@ def data_pipeline(
     train_dataset = CustomDataset(TRAIN_DATA_PATH)
     test_dataset = CustomDataset(TEST_DATA_PATH)
     val_dataset = CustomDataset(VALIDATION_DATA_PATH)
-    
+
     # Initialize the Different DataLoaders using the Datasets
     logger.info(f"Creating DataLoaders with 'batch_size'=({batch_size}), 'num_workers'=({num_workers}), 'pin_memory'=({pin_memory}). Training dataset 'drop_last'=({drop_last})")
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory, drop_last=drop_last, shuffle=True)
@@ -304,9 +316,9 @@ def data_pipeline(
     test_dataloader = DataLoader(dataset=test_dataset, batch_size=batch_size, num_workers=num_workers, pin_memory=pin_memory, drop_last=drop_last, shuffle=False)
 
     print(f"Training DataLoader has ({len(train_dataloader)}) batches, Test DataLoader has ({len(test_dataloader)}) batches, Validation DataLoader has ({len(validation_dataloader)}) batches")
-    
+
     return (train_dataset, test_dataset, val_dataset, train_dataloader, test_dataloader, validation_dataloader, feature_scaler)
-        
+
 
 # ## Agent Architecture
 
@@ -351,7 +363,7 @@ class WeatherAgent(torch.nn.Module):
         """
         super().__init__()
         self.linear = torch.nn.Linear(in_features=cfg["in_dim"], out_features=cfg["intermediate_dim"])
-        
+
         self.layers = torch.nn.Sequential(
             *[ModuleLayer(intermediate_dim=cfg["intermediate_dim"], dropout_rate=cfg["dropout_rate"]) for _ in range(cfg["num_blocks"])]
         )
@@ -387,7 +399,7 @@ def log_epoch_iteration(logger: Logger, epoch: int, avg_epoch_loss: float) -> No
         logger.info("| AVERAGES of THIS EPOCH:")
         logger.info(f"| ACCUMULATED LOSS: {avg_epoch_loss:.7f}")
         logger.info(f"===========================================================")
-    
+
     else:
         logger.warning("No Data collected for this epoch to log")
 
@@ -413,14 +425,14 @@ def evaluate_model(logger: Logger, model: Module, dataloader: DataLoader, curren
     if len(dataloader.dataset) == 0:
         logger.warning("Warning: Evaluation dataset is empty. Skipping evaluation.")
         return float('nan')
-    
+
     with torch.no_grad():
         for batch_inputs, batch_labels in dataloader:
             batch_inputs, batch_labels = batch_inputs.to(device), batch_labels.unsqueeze(dim=-1).to(device)
             outputs = model(batch_inputs)
             loss = loss_fn(outputs, batch_labels)
             total_loss += loss.item()
-    
+
     avg_loss = total_loss / len(dataloader.dataset)     # Calculate the average loss on the dataset
 
     if current_epoch and max_epochs:   # If the function was called in the training loop
@@ -468,7 +480,7 @@ def train_model(logger: Logger, model_config: dict, training_config: dict, train
         optimizer = torch.optim.AdamW(params=agent.parameters(), lr=learning_rate, weight_decay=0.01)
     else:
         raise ValueError(f"Unsupported optimizer: {optim_choice}")
-    
+
     loss_choice = training_config.get("loss_function", "mae").lower()
     if loss_choice == "mae":
         loss_fn = torch.nn.L1Loss(reduction='mean')      # Define the Loss function
@@ -496,7 +508,7 @@ def train_model(logger: Logger, model_config: dict, training_config: dict, train
 
             loss = loss_fn(agent_outputs, labels)      # Calculate the mini-batch loss
             epoch_loss_total += loss.item()
-            
+
             loss.backward()         # Calculate the loss with respect to the model parameters
             torch.nn.utils.clip_grad_norm_(parameters=agent.parameters(), max_norm=max_grad_norm)   # Prevent the gradients from affecting the model parameters too much and reduce the risk of exploding gradients
 
@@ -519,7 +531,7 @@ def train_model(logger: Logger, model_config: dict, training_config: dict, train
             history["val_loss"].append(val_loss)
             agent.train()   # Set agent to training mode
 
-        
+
     return agent.eval(), history
 
 # ## Miscelaneous Utility Functions
@@ -529,10 +541,11 @@ def train_model(logger: Logger, model_config: dict, training_config: dict, train
 def is_notebook():
     """Checks if the code is running in a Jupyter notebook environment.
     Returns:
-        bool: True if running in a Jupyter notebook, False otherwise."""
+        bool: True if running in a Jupyter notebook, False otherwise.
+    """
     try:
         shell = get_ipython().__class__.__name__
-        
+
         # print(f"Detected shell: {shell}", flush=True)
 
         if shell == 'ZMQInteractiveShell':
@@ -542,7 +555,7 @@ def is_notebook():
         else:
             return False  # Other types
     except NameError:
-        return False 
+        return False
 
 # ### Convert json to arg list
 
@@ -551,16 +564,21 @@ def json_to_arg_list(arg_dict) -> List[str]:
     Args:
         arg_dict (dict): Dictionary of arguments where keys are argument names and values are argument values.
     Returns:
-        args (list): List of arguments formatted for argparse."""
-    
+        args (list): List of arguments formatted for argparse.
+    """
+
     args = []
     for key, value in arg_dict.items():
 
         # print(f"Processing key: {key}, value: {value} type: {type(value)}")
-        if value == False or value == True:
+
+        # Checks if the value is a boolean flag
+        if value is False or value is True:
+            # Only add the flag if it's True
             if value:
                 args.append(key)
         else:
+            # Add both the key and its value
             args.append(key)
             args.append(str(value))
     return args
@@ -603,12 +621,12 @@ def setup_logger(config: dict, propogate: bool=False) -> Logger:
             except OSError as e:
                 print(f"Error creating directory '{parent_dir}': {e} INFO: Using default log file 'app.log' instead.", flush=True)
                 log_file='app.log'      # Fall back to a default log file if problem occurs.
-        
+
         # Remove all old handlers inherrited from the root logger
-        for handler in logger.handlers[:]:  
+        for handler in logger.handlers[:]:
             handler.close()
             logger.removeHandler(handler)
-        
+
         formatter = logging.Formatter(fmt=log_format, datefmt=date_format)   # Create a formatter for the log messages
 
         if log_to_console:
@@ -626,8 +644,8 @@ def setup_logger(config: dict, propogate: bool=False) -> Logger:
 
     logger.setLevel(log_level)  # Set logger minimum log level
 
-    logger.propagate = propogate   # Prevent the log messages from being propagated to the root logger; gets rid of the root logger's default handlers, 
-    
+    logger.propagate = propogate   # Prevent the log messages from being propagated to the root logger; gets rid of the root logger's default handlers
+
     return logger
 
 # ### Retrieve Logger
@@ -666,9 +684,9 @@ def close_and_exit(logger: Logger, exit_code: int) -> None:
     for handler in logging.root.handlers[:]:
         handler.close()
         logging.root.removeHandler(handler)
-    
+
     print(f"Exiting program with exit code {exit_code}.", flush=True)
-    
+
     if is_notebook():
         print("Detected Jupyter Notebook environment. Skipping sys.exit() to avoid kernel interruption.", flush=True)
     else:
@@ -682,32 +700,33 @@ def main(parser_args, global_config) -> int:
         parser_args: The arguments from the argument parser.
         global_config: The arguments from the config file.
     Returns:
-        int: Exit code (0 for success, non-zero for failure).    """
+        int: Exit code (0 for success, non-zero for failure).
+    """
     # Create logger object
     logger = retrieve_logger(global_config["logging"]["logger_name"])
     logger.info("STARTING MAIN FUNCTION")
-    
+
     if parser_args.device == 'cpu' or parser_args.device == 'cuda':     # Check if the user specified to use a CPU or GPU for training
         DEVICE = parser_args.device
     else:
         if parser_args.use_cuda:   # Check if the user wanted to use CUDA if available.
             DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else: 
+        else:
             logger.info("Defaulted to using CPU for training.")
             DEVICE = 'cpu'
 
-    SAVE_LOCATION = global_config["parser_defaults"]["model_output_path"]   # Get the model save destination path 
+    SAVE_LOCATION = global_config["parser_defaults"]["model_output_path"]   # Get the model save destination path
 
     BASE_CONFIG=global_config["model"]
     TRAINING_CONFIG=global_config["training"]
     PIPELINE_CONFIG=global_config["data"]
-    
-    # --- Data Preparation Pipeline --- 
+
+    # --- Data Preparation Pipeline ---
     logger.info("RUNNING THE DATA PIPELINE")
     try:
         # Use dictionary unpacking to pass the PIPELINE_CONFIG parameters to the data_pipeline function
         (train_dataset, test_dataset, validation_dataset, train_dataloader, test_dataloader, validation_dataloader, feature_scaler) = data_pipeline(logger=logger, **PIPELINE_CONFIG, batch_size=parser_args.dataloader_batch_size, num_workers=parser_args.dataloader_num_workers, pin_memory=parser_args.dataloader_pin_memory, drop_last=True)
-    
+
     except ValueError as e:
         logger.error(f"Caught a 'value' error: {e}", exc_info=True, stack_info=True)
         return 1
@@ -720,7 +739,7 @@ def main(parser_args, global_config) -> int:
 
     try:
         trained_policy, training_history = train_model(
-            logger=logger, 
+            logger=logger,
             model_config=BASE_CONFIG,
             training_config=TRAINING_CONFIG,
             train_dataloader=train_dataloader,
@@ -744,7 +763,7 @@ def main(parser_args, global_config) -> int:
         return 1
     end_time=time.time()
 
-    # --- Calculate Training Time --- 
+    # --- Calculate Training Time ---
 
     elapsed_time= end_time - start_time
     hrs = int(elapsed_time / 3600)
@@ -758,11 +777,11 @@ def main(parser_args, global_config) -> int:
     logger.info("TRAINING HISTORY:")
     logger.info(training_history)
 
-    # --- Testing Trained Model --- 
+    # --- Testing Trained Model ---
     logger.info("TESTING THE TRAINED POLICY:")
     test_loss = evaluate_model(logger=logger, model=trained_policy, dataloader=test_dataloader, current_epoch=None, max_epochs=None, device='cpu')
 
-    # ---  Saving Model Section  ---   
+    # ---  Saving Model Section  ---
     if parser_args.save_model:     # Check if the user wants to save the trained model weights
         logger.info("SAVING THE TRAINED POLICY:")
         if parser_args.model_output_path:     # Check if the user specified a target save location
@@ -779,7 +798,7 @@ def main(parser_args, global_config) -> int:
             except OSError as e:
                 logger.error(f"Error creating directory {parent_dir}: {e}", exc_info=True, stack_info=True)
                 SAVE_LOCATION='model.pt'      # Fall back to a default save location if problem occurs.
-        
+
         try:
             torch.save(trained_policy.state_dict(), f=SAVE_LOCATION)
             logger.info(f"Model weights saved in: {SAVE_LOCATION}")
@@ -797,20 +816,20 @@ if __name__ == '__main__':
 
     #  --- Load Config File ---
     try:
-        with open(file=CONFIG_PATH, mode='r') as f:
+        with open(file=CONFIG_PATH, mode='r', encoding='utf-8') as f:
             json_args = json.load(f)
     except FileNotFoundError:
         print(f"Config file not found. Please ensure '{CONFIG_PATH}' exists. Modify 'CONFIG_PATH' in Global Variables section if needed.", flush=True)
-        exit(1)
-    except Exception as e:
-        print(f"Unexpected error loading config file: {e}. Exiting.")
-        exit(1)
+        sys.exit(1)
+    except RuntimeError as e:
+        print(f"Unexpected runtime error loading config file: {e}. Exiting.")
+        sys.exit(1)
 
     # --- Logging Initialization Section ---
     log_to_console = json_args['logging']['log_to_console'] # Set whether to log to console or not
     log_to_file = json_args['logging']['log_to_file']   # Set whether to log to a logfile or not
     logger_config = json_args['logging']
-    
+
     # Configure the root logger for any backup logging
     logging.basicConfig(level=logging.CRITICAL)  # Set root logger to highest level to suppress unwanted logs
 
@@ -821,7 +840,7 @@ if __name__ == '__main__':
     elif not log_to_file and not log_to_console:
         print(f"========================================\nWarning: No logging handlers configured for logger, using root logger.\nVerbose Logging will be disabled.\nTraining progress will be shown using tqdm.\nIf you want to change the logging behavior:\nIn 'config/config.json', set ['log_to_file': true] or ['log_to_console': true]\n========================================\n ", flush=True)
         logger = logging.getLogger()  # Use the root logger
-        
+
         # Remove all handlers inherrited from the root logger, if any exist
         for handler in logger.handlers[:]:
             handler.close()
@@ -835,7 +854,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--learning_rate', type=float, default=json_args["parser_defaults"]["learning_rate"],
         help=f'(float, default={json_args["parser_defaults"]["learning_rate"]}) Learning rate used by the optimizer.')
-    
+
     parser.add_argument('--max_grad_norm', type=float, default=json_args["parser_defaults"]["max_grad_norm"],
         help=f'(float, default={json_args["parser_defaults"]["max_grad_norm"]}) The Maximum L2 Norm of the gradients for Gradient Clipping.')
 
@@ -868,8 +887,8 @@ if __name__ == '__main__':
 
     # --- Parse the argparse arguments ---
 
-    if(is_notebook()):
-        # --- Simulate command-line arguments for testing purposes (IPYNB TESTING ONLY) --- 
+    if is_notebook():
+        # --- Simulate command-line arguments for testing purposes (IPYNB TESTING ONLY) ---
         json_sim_args = json_args["simulated_args"]
         # Convert JSON args to list for argparse
         simulated_args = json_to_arg_list(json_sim_args)
@@ -877,7 +896,7 @@ if __name__ == '__main__':
         parser_args = parser.parse_args(args=simulated_args)   # Overrides the default values with the simulated values
     else:   # Parse the argparse command-line arguments
         parser_args = parser.parse_args()
-    
+
     # Log all of the passed parser arguments
     logger.info(parser_args)
 
@@ -889,7 +908,7 @@ if __name__ == '__main__':
 
     main_end_time=time.time()
 
-    # --- Calculate Main Script Execution Time --- 
+    # --- Calculate Main Script Execution Time ---
 
     elapsed_time= main_end_time - main_start_time
     hrs = int(elapsed_time / 3600)
@@ -913,5 +932,3 @@ if __name__ == '__main__':
 
     # --- Closes any logger file handlers and exits the program ---
     close_and_exit(logger, ret)
-
-

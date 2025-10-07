@@ -1,6 +1,6 @@
 ---
-title: Weather Test
-emoji: 🚀
+title: Weather-Test
+emoji: 🌍
 colorFrom: pink
 colorTo: pink
 sdk: docker
