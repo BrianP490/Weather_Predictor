@@ -1,7 +1,7 @@
 {
   "data": {
     "dataset_url": "hf://datasets/MaxPrestige/CA_Weather_Fire_Dataset_Cleaned/Data/CA_Weather_Fire_Dataset_Cleaned.csv",
-    "root_data_dir": "../Data",
+    "root_data_dir": "./Data",
     "data_file_path": "dataset_cleaned.csv",
     "data_splits_dir": "DataSplits",
     "scaler_dir": "Scalers",
@@ -10,14 +10,14 @@
   }
   ,
   "parser_defaults": {
-    "epochs": 8,
+    "epochs": 4,
     "learning_rate": 0.0003,
     "max_grad_norm": 3.0,
     "dataloader_batch_size": 64,
     "dataloader_pin_memory": false,
     "dataloader_num_workers": 0,
     "log_iterations": 32,
-    "eval_iterations": 32,
+    "eval_iterations": 64,
     "use_cuda": false,
     "device": "cpu",
     "save_model": false,
