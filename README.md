@@ -113,18 +113,18 @@ You can customize the behavior of the training script by providing the following
 
     - Type: str
 
-    - Default: "models/Spam-Classifier-GPT2-Model.pt"
+    - Default: "models/Model.pt"
 
     - Description: File path to save the trained model. Parent directories will be created if they do not exist.
 
 
 ### Example Commands:
-- ```python Training_Loop_00_01.py```
+- ```python train.py```
     - Uses the default settings to run the script.
     
-- ```pythonTraining_Loop_00_01.py --epochs=32  --log_iterations=4 --eval_iterations=8 --save_model```
+- ```python train.py --epochs=32  --log_iterations=4 --eval_iterations=8 --save_model```
     - Explanation: Run for 32 epochs and log the average batch iteration Mean Absolute Error Loss every 4 iterations. Evaluate the Policy under training every 8 epochs. Lastly, save the trained model. Uses the default save path. Uses default for everything else.
     
     
-- ```pythonTraining_Loop_00_01.py --epochs=32  --use_cuda --save_model --model_output_path=models/first-trained-model.pt```
+- ```python train.py --epochs=32  --use_cuda --save_model --model_output_path=models/first-trained-model.pt```
     - Explanation: Let the system detect if your system has GPU capabilities and has cuda available for training. During the training setup, the system dynamically sets the device variable for model training. Save the trained model using the specified location. Uses default for everything else.
