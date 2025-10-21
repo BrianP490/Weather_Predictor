@@ -1,4 +1,4 @@
-# MAX TEMPERATURE WEATHER PREDICTER
+# MAX TEMPERATURE WEATHER PREDICTOR
 Attempted to create a trained model policy that can accurately predict the maximum temperature of a given day based on feature inputs.
 
 ## Data Source
@@ -14,7 +14,7 @@ This is in part due to the many outliers in the dataset after looking at the ran
 
 The Model also has High variance as it achieves a high Mean Absolute Error on the Test Dataset (5.3667). 
 
-## Possible Future Attemps
+## Possible Future Attempts
 The Data needs to be modified in order for the model to fit the underlying patterns (e.g. removing entries that have a max temp of 85 or higher). Another method would be to gather more data where the max temperature is between 85 and 105. 
 
 ## Main Script Parameters:
