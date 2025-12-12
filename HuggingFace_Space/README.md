@@ -1,5 +1,5 @@
 ---
-title: Weather Test
+title: Weather-Agent
 emoji: 🚀
 colorFrom: pink
 colorTo: pink
@@ -8,7 +8,7 @@ app_port: 8501
 tags:
 - streamlit
 pinned: false
-short_description: Streamlit Weather Agent App
+short_description: Max Daily Temperature Predictor
 ---
 
 # 🛢️MAX Temperature for a Given Day
