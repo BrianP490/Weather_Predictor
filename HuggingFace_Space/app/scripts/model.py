@@ -22,7 +22,8 @@ class ModuleLayer(torch.nn.Module):
         Args:
             x (torch.Tensor): Input tensor.
         Returns:
-            torch.Tensor: Output tensor passing the input through the layer operations."""
+            torch.Tensor: Output tensor passing the input through the layer operations.
+        """
         residual = x
         x = self.mod_linear(x)
         x = self.mod_norm(x)
@@ -65,12 +66,10 @@ class Agent(torch.nn.Module):
 
     def get_prediction(self, features):
         """Get the deterministic prediction on a single observation or a batch of observations.
-        
         Parameters:
             features (torch.tensor): the agent's input features. Expected shape is either
             `(num_features,)` for a single observation
             or `(batch_size, num_features)` for a batch of observations.
-        
         Returns:
             action (int or torch.tensor): 
                 - If `features` is a single features (i.e., `features.dim() == 1`), returns a
@@ -78,7 +77,8 @@ class Agent(torch.nn.Module):
 
                 - If `features` is a batch of features (i.e., `features.dim() > 1`),
                 returns a `torch.Tensor` of `int`s, where each element is the
-                chosen action for the corresponding observation in the batch"""
+                chosen action for the corresponding observation in the batch
+        """
         # Ensure single samples have a batch dimension
         if features.dim() == 1:
             # Add a batch dimension if it's a single batch of features

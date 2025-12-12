@@ -21,7 +21,7 @@
     "use_cuda": false,
     "device": "cpu",
     "save_model": false,
-    "model_output_path": "model.pt"
+    "model_output_path": "models/Model.pt"
   },
   "model": {
     "in_dim": 5,
